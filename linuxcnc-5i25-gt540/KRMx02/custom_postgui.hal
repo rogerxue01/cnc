@@ -1,0 +1,102 @@
+# Include your customized HAL commands here
+# The commands in this file are run after the AXIS GUI (including PyVCP panel) starts
+
+loadrt  or2 count=2
+loadrt  mux2 count=1
+loadrt  and2 count=6
+loadrt  not count=1
+
+addf or2.0 servo-thread
+addf or2.1 servo-thread
+addf mux2.0 servo-thread
+addf and2.0 servo-thread
+addf and2.1 servo-thread
+addf and2.2 servo-thread
+addf and2.3 servo-thread
+addf and2.4 servo-thread
+addf and2.5 servo-thread
+addf not.0 servo-thread
+
+
+net spindle-at-speed => pyvcp.spindle-at-speed
+net pyvcp-spindle-rpm spindle-vfd.spindle-speed-fb => pyvcp.spindle-speed
+net pyvcp-modbus-ok spindle-vfd.hycomm-ok => pyvcp.hycomm-ok
+
+#######################################
+######    joyspad
+#
+# input.0.btn-base3    ->   #9
+# input.0.btn-base4    ->   #10
+# input.0.btn-joystick ->   #1
+# input.0.btn-thumb    ->   #2
+# input.0.btn-thumb2   ->   #3
+# input.0.btn-top      ->   #4
+# input.0.btn-top2     ->   #5
+# input.0.btn-pinkie   ->   #6
+# input.0.btn-base     ->   #7
+# input.0.btn-base2    ->   #8
+# input.0.btn-base5    ->   left joystick press
+# input.0.btn-base6    ->   right joystick press
+#
+# input.0.abs-hat0x-position     ->   hat x
+# input.0.abs-hat0y-position     ->   hat y
+#
+# input.0.abs-x-position    ->  left joystick left-right
+# input.0.abs-y-position    ->  left joystick up-down
+# input.0.abs-z-position    ->  right joystick left-right
+# input.0.abs-rz-position    ->  right joystick up-down
+#
+
+
+#jog using joystick, press #7 to rapid
+setp mux2.0.in0 10
+setp mux2.0.in1 300
+net rapid-override input.0.btn-base => mux2.0.sel not.0.in
+net jog-speed halui.jog-speed <= mux2.0.out
+
+setp input.0.abs-y-scale -127.5
+setp input.0.abs-rz-scale -127.5
+net joy-x-jog halui.jog.0.analog <= input.0.abs-x-position 
+net joy-y-jog halui.jog.1.analog <= input.0.abs-y-position 
+net joy-z-jog halui.jog.2.analog <= input.0.abs-rz-position
+
+
+#jog with hat, only works when rapid override is not pressed
+net hat-jog-condition-x-0 not.0.out => and2.0.in0 and2.1.in0 and2.2.in0 and2.3.in0
+net hat-jog-condition-x-pos-1 and2.0.in1 <= input.0.abs-hat0x-is-pos
+net jog-x-pos and2.0.out => halui.jog.0.plus
+net hat-jog-condition-x-neg-1 and2.1.in1 <= input.0.abs-hat0x-is-neg
+net jog-x-neg and2.1.out => halui.jog.0.minus
+net hat-jog-condition-y-pos-1 and2.2.in1 <= input.0.abs-hat0y-is-pos
+net jog-y-neg and2.2.out => halui.jog.1.minus
+net hat-jog-condition-y-neg-1 and2.3.in1 <= input.0.abs-hat0y-is-neg
+net jog-y-pos and2.3.out => halui.jog.1.plus
+
+
+# center button toggle e-stop
+net estop-set  input.0.btn-base3 => halui.estop.activate
+net estop-reset input.0.btn-base4 => halui.estop.reset halui.machine.on 
+
+# touch off tool #3
+net tool-touch-off-0 or2.0.in0 <= input.0.btn-thumb2
+
+# home all #4
+net home-all halui.home-all <= input.0.btn-top
+
+# touch off x and y, #1 x, #2 y
+net touch-off-x input.0.btn-joystick => halui.mdi-command-02
+net touch-off-y input.0.btn-thumb => halui.mdi-command-03
+
+
+######################################
+######  pyvcp related code
+
+# set up the rapid to home button
+net remote-rapid-to-home halui.mdi-command-00 <= pyvcp.rapid-to-home
+
+# set up the touch plate button
+net tool-touch-off-1 or2.0.in1 <= pyvcp.laserzero
+net tool-touch-off halui.mdi-command-01 <= or2.0.out
+
+
+
